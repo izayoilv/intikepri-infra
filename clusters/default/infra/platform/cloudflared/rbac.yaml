@@ -1,0 +1,31 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: intikepri-opentofu-secret-writer
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: intikepri-cloudflared
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+rules:
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: intikepri-opentofu-tf-runner
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: intikepri-cloudflared
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: intikepri-opentofu-secret-writer
+subjects:
+  - kind: ServiceAccount
+    name: tf-runner
+    namespace: flux-system

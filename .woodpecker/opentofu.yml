@@ -1,0 +1,21 @@
+when:
+  - event: push
+    branch: main
+  - event: pull_request
+  - event: manual
+
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+    settings:
+      depth: 1
+      lfs: false
+
+steps:
+  lint-and-validate:
+    image: quay.io/thegeeklab/wp-opentofu
+    settings:
+      root_dir: opentofu
+      action:
+        - fmt
+        - validate

@@ -1,0 +1,21 @@
+apiVersion: infra.contrib.fluxcd.io/v1alpha2
+kind: Terraform
+metadata:
+  name: intikepri-opentofu
+  namespace: flux-system
+spec:
+  approvePlan: auto
+  path: ./opentofu
+  interval: 1h
+  sourceRef:
+    kind: GitRepository
+    name: intikepri-infra
+    namespace: flux-system
+  varsFrom:
+    - kind: Secret
+      name: intikepri-opentofu-secrets
+      varsKeys:
+        - cloudflare_api_token
+        - openbao_token
+        - cloudflare_zone_id
+        - cloudflare_account_id

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: intikepri-openbao-config
+  namespace: intikepri-openbao
+  labels:
+    app.kubernetes.io/name: intikepri-openbao
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+data:
+  openbao.hcl: |
+    ui = true
+    storage "file" {
+      path = "/data"
+    }
+    listener "tcp" {
+      address     = "0.0.0.0:8200"
+      tls_disable = true
+    }
+    api_addr = "http://intikepri-openbao.intikepri-openbao.svc:8200"

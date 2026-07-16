@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: intikepri-openbao-ingress
+  namespace: intikepri-openbao
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: |
+      kube-system-intikepri-rate-limit@kubernetescrd,
+      kube-system-intikepri-security-headers@kubernetescrd
+  labels:
+    app.kubernetes.io/name: intikepri-openbao
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: openbao.intikepri.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: intikepri-openbao
+                port:
+                  number: 8200
