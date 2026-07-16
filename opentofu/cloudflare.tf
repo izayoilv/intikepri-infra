@@ -82,3 +82,27 @@ resource "cloudflare_dns_record" "openbao_intikepri_com" {
   proxied = true
   ttl     = 1
 }
+
+resource "cloudflare_ruleset" "www_redirect" {
+  zone_id     = var.cloudflare_zone_id
+  name        = "redirect-www-to-apex"
+  description = "Permanent redirect www.intikepri.com to intikepri.com"
+  kind        = "zone"
+  phase       = "http_request_dynamic_redirect"
+
+  rules = [{
+    description = "Redirect www to apex"
+    expression  = "(http.host eq \"www.intikepri.com\")"
+    action      = "redirect"
+    enabled     = true
+    action_parameters = {
+      from_value = {
+        status_code = 301
+        preserve_query_string = true
+        target_url = {
+          expression = "concat(\"https://intikepri.com\", http.request.uri.path)"
+        }
+      }
+    }
+  }]
+}
