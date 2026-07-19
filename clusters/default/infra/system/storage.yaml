@@ -14,3 +14,20 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: intikepri-cms-pvc
+  namespace: intikepri-cms
+  labels:
+    app.kubernetes.io/name: intikepri-cms
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
