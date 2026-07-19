@@ -83,6 +83,24 @@ resource "cloudflare_dns_record" "openbao_intikepri_com" {
   ttl     = 1
 }
 
+resource "cloudflare_dns_record" "api_intikepri_com" {
+  zone_id = var.cloudflare_zone_id
+  name    = "api"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.intikepri.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_dns_record" "admin_intikepri_com" {
+  zone_id = var.cloudflare_zone_id
+  name    = "admin"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.intikepri.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
 resource "cloudflare_ruleset" "www_redirect" {
   zone_id     = var.cloudflare_zone_id
   name        = "redirect-www-to-apex"

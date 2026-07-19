@@ -16,3 +16,12 @@ metadata:
     app.kubernetes.io/part-of: intikepri
     app.kubernetes.io/managed-by: flux
     tier: security
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intikepri-cms
+  labels:
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+    tier: application
