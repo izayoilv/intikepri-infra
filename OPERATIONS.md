@@ -40,6 +40,66 @@ kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOK
 # 3. Reference the Kubernetes Secret in the Terraform CRD's varsFrom
 ```
 
+### Webhook tokens for image automation
+
+The `intikepri-static-webhook` ExternalSecret syncs the webhook token from `kv/intikepri-static/webhook-token` in intikepri-openbao. This token is used by both the Forgejo and Docker Hub webhook Receivers in kudofools-infra.
+
+To set it up:
+
+```bash
+# 1. Generate a random token
+WEBHOOK_TOKEN=$(openssl rand -base64 32)
+
+# 2. Write to intikepri-openbao
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-static/webhook-token token=$WEBHOOK_TOKEN
+
+# 3. Get the Receiver webhook paths
+GIT_PATH=$(kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}')
+IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}')
+
+echo "Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$GIT_PATH"
+echo "Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$IMAGE_PATH"
+```
+
+### Forgejo webhook configuration
+
+In the intikepri-static repo on Forgejo, go to **Settings → Webhooks → Add Webhook** and select **Forgejo** as the type:
+
+| Field | Value |
+|---|---|
+| Target URL | `http://notification-controller.flux-system.svc.cluster.local:80<git-webhook-path>` |
+| HTTP Method | POST |
+| POST Content Type | `application/json` |
+| Secret | the token from `kv/intikepri-static/webhook-token` |
+| Trigger On | Push Events |
+| Branch filter | `main` |
+| Authorization header | leave empty |
+
+Flux validates the webhook via `X-Hub-Signature` HMAC using the shared secret, not the Authorization header.
+
+### Docker Hub webhook configuration
+
+In the `izayoilv/intikepri-static` repo on Docker Hub, go to **Webhooks** tab:
+
+| Field | Value |
+|---|---|
+| **Name** | `Flux Image Automation` |
+| **URL** | `http://notification-controller.flux-system.svc.cluster.local:80<image-webhook-path>` |
+
+No secret, no content type, no event selection. Docker Hub sends a POST to that URL on every image push. The token is embedded in the webhook path itself (Flux generates a unique path from Receiver name + namespace + token), so no separate secret field is needed.
+
+To get the webhook paths:
+
+```bash
+# Forgejo webhook
+kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}'
+# → /hook/abc123...  (full URL: http://notification-controller.flux-system.svc.cluster.local:80/hook/abc123...)
+
+# Docker Hub webhook
+kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}'
+# → /hook/def456...  (full URL: http://notification-controller.flux-system.svc.cluster.local:80/hook/def456...)
+```
+
 ### Bootstrap secrets
 
 The `intikepri-opentofu-secrets` Secret in `flux-system` contains bootstrap credentials (`cloudflare_api_token`, `openbao_token`, `cloudflare_zone_id`, `cloudflare_account_id`). These are the keys to the kingdom and must be provided manually — they can't come from OpenBao since OpenTofu configures OpenBao itself. Keep them secure and rotate periodically.

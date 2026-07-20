@@ -17,7 +17,7 @@ clusters/default/
 │   └── apps/
 │       └── openbao/          # OpenBao StatefulSet + Service + Ingress
 ├── platform/
-│   └── eso-resources/        # ClusterSecretStore
+│   └── eso-resources/        # ClusterSecretStore + ExternalSecrets
 │                               (uses kudofools-infra's ESO)
 └── opentofu/                  # OpenTofu IaC (applied by tofu-controller)
     ├── main.tf               # Provider configs

@@ -14,10 +14,10 @@ resource "vault_mount" "kv" {
   description = "KV v2 secrets engine for intikepri"
 }
 
-resource "vault_policy" "cloudflared" {
-  name     = "cloudflared"
+resource "vault_policy" "intikepri_static" {
+  name     = "intikepri-static"
   policy   = <<EOT
-path "kv/data/cloudflared/intikepri-credentials" {
+path "kv/data/intikepri-static/*" {
   capabilities = ["read"]
 }
 EOT
@@ -28,7 +28,7 @@ resource "vault_kubernetes_auth_backend_role" "eso" {
   role_name                      = "eso"
   bound_service_account_names    = ["external-secrets"]
   bound_service_account_namespaces = ["flux-system"]
-  token_policies                 = [vault_policy.cloudflared.name]
+  token_policies                 = [vault_policy.intikepri_static.name]
   token_ttl                      = 3600
 }
 
