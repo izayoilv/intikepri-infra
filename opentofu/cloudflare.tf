@@ -1,5 +1,5 @@
 resource "random_id" "tunnel_secret" {
-  byte_length  = 32
+  byte_length = 32
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "intikepri" {
@@ -115,7 +115,7 @@ resource "cloudflare_ruleset" "www_redirect" {
     enabled     = true
     action_parameters = {
       from_value = {
-        status_code = 301
+        status_code           = 301
         preserve_query_string = true
         target_url = {
           expression = "concat(\"https://intikepri.com\", http.request.uri.path)"
