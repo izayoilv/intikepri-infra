@@ -48,6 +48,7 @@ Two separate ExternalSecrets sync webhook tokens from intikepri-openbao, one per
 |---|---|---|
 | `intikepri-static-webhook` | `kv/intikepri-static/webhook-token` | `intikepri-static` Receivers |
 | `intikepri-cms-webhook` | `kv/intikepri-cms/webhook-token` | `intikepri-cms` Receivers |
+| `intikepri-infra-webhook` | `kv/intikepri-infra/webhook-token` | `intikepri-infra-webhook` Receiver |
 
 To set them up:
 
@@ -55,10 +56,12 @@ To set them up:
 # 1. Generate unique tokens
 STATIC_TOKEN=$(openssl rand -base64 32)
 CMS_TOKEN=$(openssl rand -base64 32)
+INFRA_TOKEN=$(openssl rand -base64 32)
 
 # 2. Write to intikepri-openbao
 kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-static/webhook-token token=$STATIC_TOKEN
 kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/webhook-token token=$CMS_TOKEN
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-infra/webhook-token token=$INFRA_TOKEN
 
 # 3. Get the Receiver webhook paths
 # intikepri-static
@@ -74,6 +77,10 @@ CMS_IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-cms-image -o json
 
 echo "intikepri-cms Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_GIT_PATH"
 echo "intikepri-cms Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_IMAGE_PATH"
+
+# intikepri-infra
+INFRA_PATH=$(kubectl get receiver -n flux-system intikepri-infra-webhook -o jsonpath='{.status.webhookPath}')
+echo "intikepri-infra Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$INFRA_PATH"
 ```
 
 ### Forgejo webhook configuration
@@ -105,6 +112,13 @@ Flux validates the webhook via `X-Hub-Signature` HMAC using the shared secret, n
 - Receiver: `intikepri-cms-git`
 - OpenBao path: `kv/intikepri-cms/webhook-token`
 - Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-cms-git -o jsonpath='{.status.webhookPath}'`
+
+#### intikepri-infra (flux-system)
+
+- Forgejo repo: `izayoilv/intikepri-infra`
+- Receiver: `intikepri-infra-webhook`
+- OpenBao path: `kv/intikepri-infra/webhook-token`
+- Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-infra-webhook -o jsonpath='{.status.webhookPath}'`
 
 ### Docker Hub webhook configuration
 
@@ -165,6 +179,7 @@ kubectl annotate receiver -n flux-system intikepri-static-git reconcile.fluxcd.i
 kubectl annotate receiver -n flux-system intikepri-static-image reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
 kubectl annotate receiver -n flux-system intikepri-cms-git reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
 kubectl annotate receiver -n flux-system intikepri-cms-image reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate receiver -n flux-system intikepri-infra-webhook reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
 ```
 
 If any of these fail to reconcile, check status:

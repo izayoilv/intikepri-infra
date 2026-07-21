@@ -32,12 +32,21 @@ path "kv/data/intikepri-cms/*" {
 EOT
 }
 
+resource "vault_policy" "intikepri_infra" {
+  name   = "intikepri-infra"
+  policy = <<EOT
+path "kv/data/intikepri-infra/*" {
+  capabilities = ["read"]
+}
+EOT
+}
+
 resource "vault_kubernetes_auth_backend_role" "eso" {
   backend                          = vault_kubernetes_auth_backend_config.kubernetes.backend
   role_name                        = "eso"
   bound_service_account_names      = ["external-secrets"]
   bound_service_account_namespaces = ["flux-system"]
-  token_policies                   = [vault_policy.intikepri_static.name, vault_policy.intikepri_cms.name]
+  token_policies                   = [vault_policy.intikepri_static.name, vault_policy.intikepri_cms.name, vault_policy.intikepri_infra.name]
   token_ttl                        = 3600
 }
 
