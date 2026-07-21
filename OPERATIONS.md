@@ -42,44 +42,73 @@ kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOK
 
 ### Webhook tokens for image automation
 
-The `intikepri-static-webhook` ExternalSecret syncs the webhook token from `kv/intikepri-static/webhook-token` in intikepri-openbao. This token is used by both the Forgejo and Docker Hub webhook Receivers in kudofools-infra.
+Two separate ExternalSecrets sync webhook tokens from intikepri-openbao, one per project:
 
-To set it up:
+| ExternalSecret | OpenBao path | Used by |
+|---|---|---|
+| `intikepri-static-webhook` | `kv/intikepri-static/webhook-token` | `intikepri-static` Receivers |
+| `intikepri-cms-webhook` | `kv/intikepri-cms/webhook-token` | `intikepri-cms` Receivers |
+
+To set them up:
 
 ```bash
-# 1. Generate a random token
-WEBHOOK_TOKEN=$(openssl rand -base64 32)
+# 1. Generate unique tokens
+STATIC_TOKEN=$(openssl rand -base64 32)
+CMS_TOKEN=$(openssl rand -base64 32)
 
 # 2. Write to intikepri-openbao
-kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-static/webhook-token token=$WEBHOOK_TOKEN
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-static/webhook-token token=$STATIC_TOKEN
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/webhook-token token=$CMS_TOKEN
 
 # 3. Get the Receiver webhook paths
-GIT_PATH=$(kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}')
-IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}')
+# intikepri-static
+STATIC_GIT_PATH=$(kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}')
+STATIC_IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}')
 
-echo "Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$GIT_PATH"
-echo "Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$IMAGE_PATH"
+echo "intikepri-static Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$STATIC_GIT_PATH"
+echo "intikepri-static Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$STATIC_IMAGE_PATH"
+
+# intikepri-cms
+CMS_GIT_PATH=$(kubectl get receiver -n flux-system intikepri-cms-git -o jsonpath='{.status.webhookPath}')
+CMS_IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-cms-image -o jsonpath='{.status.webhookPath}')
+
+echo "intikepri-cms Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_GIT_PATH"
+echo "intikepri-cms Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_IMAGE_PATH"
 ```
 
 ### Forgejo webhook configuration
 
-In the intikepri-static repo on Forgejo, go to **Settings → Webhooks → Add Webhook** and select **Forgejo** as the type:
+Flux watches both the `intikepri-static` and `intikepri-cms` repos on Forgejo. For each repo, go to **Settings → Webhooks → Add Webhook** and select **Forgejo** as the type:
 
 | Field | Value |
 |---|---|
 | Target URL | `http://notification-controller.flux-system.svc.cluster.local:80<git-webhook-path>` |
 | HTTP Method | POST |
 | POST Content Type | `application/json` |
-| Secret | the token from `kv/intikepri-static/webhook-token` |
+| Secret | the token from the project's OpenBao path (`kv/intikepri-static/webhook-token` or `kv/intikepri-cms/webhook-token`) |
 | Trigger On | Push Events |
 | Branch filter | `main` |
 | Authorization header | leave empty |
 
 Flux validates the webhook via `X-Hub-Signature` HMAC using the shared secret, not the Authorization header.
 
+#### intikepri-static
+
+- Forgejo repo: `izayoilv/intikepri-static`
+- Receiver: `intikepri-static-git`
+- OpenBao path: `kv/intikepri-static/webhook-token`
+- Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}'`
+
+#### intikepri-cms
+
+- Forgejo repo: `izayoilv/intikepri-cms`
+- Receiver: `intikepri-cms-git`
+- OpenBao path: `kv/intikepri-cms/webhook-token`
+- Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-cms-git -o jsonpath='{.status.webhookPath}'`
+
 ### Docker Hub webhook configuration
 
-In the `izayoilv/intikepri-static` repo on Docker Hub, go to **Webhooks** tab:
+In each Docker Hub repo, go to **Webhooks** tab:
 
 | Field | Value |
 |---|---|
@@ -88,17 +117,19 @@ In the `izayoilv/intikepri-static` repo on Docker Hub, go to **Webhooks** tab:
 
 No secret, no content type, no event selection. Docker Hub sends a POST to that URL on every image push. The token is embedded in the webhook path itself (Flux generates a unique path from Receiver name + namespace + token), so no separate secret field is needed.
 
-To get the webhook paths:
+#### intikepri-static
 
-```bash
-# Forgejo webhook
-kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}'
-# → /hook/abc123...  (full URL: http://notification-controller.flux-system.svc.cluster.local:80/hook/abc123...)
+- Docker Hub repo: `izayoilv/intikepri-static`
+- Receiver: `intikepri-static-image`
+- Kubernetes secret: `intikepri-static-webhook`
+- Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}'`
 
-# Docker Hub webhook
-kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}'
-# → /hook/def456...  (full URL: http://notification-controller.flux-system.svc.cluster.local:80/hook/def456...)
-```
+#### intikepri-cms
+
+- Docker Hub repo: `izayoilv/intikepri-cms`
+- Receiver: `intikepri-cms-image`
+- Kubernetes secret: `intikepri-cms-webhook`
+- Webhook path: retrieve via `kubectl get receiver -n flux-system intikepri-cms-image -o jsonpath='{.status.webhookPath}'`
 
 ### Bootstrap secrets
 
@@ -110,6 +141,39 @@ The tunnel credentials and config are managed by OpenTofu (created as a Kubernet
 
 ```bash
 kubectl annotate terraform -n flux-system intikepri-opentofu reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+```
+
+## Reconciling Image Automation Resources
+
+To force immediate reconciliation of image automation resources instead of waiting for the polling interval:
+
+```bash
+# Force ImageRepository to check Docker Hub
+kubectl annotate imagerepository -n flux-system intikepri-static reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate imagerepository -n flux-system intikepri-cms reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+
+# Force ImagePolicy to re-evaluate tag ordering
+kubectl annotate imagepolicy -n flux-system intikepri-static reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate imagepolicy -n flux-system intikepri-cms reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+
+# Force ImageUpdateAutomation to commit image updates
+kubectl annotate imageupdateautomation -n flux-system intikepri-static reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate imageupdateautomation -n flux-system intikepri-cms reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+
+# Force Receiver to process webhook
+kubectl annotate receiver -n flux-system intikepri-static-git reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate receiver -n flux-system intikepri-static-image reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate receiver -n flux-system intikepri-cms-git reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+kubectl annotate receiver -n flux-system intikepri-cms-image reconcile.fluxcd.io/requestedAt="$(date +%s)" --field-manager=flux
+```
+
+If any of these fail to reconcile, check status:
+
+```bash
+kubectl describe imagerepository -n flux-system intikepri-cms
+kubectl describe imagepolicy -n flux-system intikepri-cms
+kubectl describe imageupdateautomation -n flux-system intikepri-cms
+kubectl describe receiver -n flux-system intikepri-cms-git
 ```
 
 ## Updating OpenTofu Configs
