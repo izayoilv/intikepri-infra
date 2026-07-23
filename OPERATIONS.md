@@ -68,19 +68,19 @@ kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOK
 STATIC_GIT_PATH=$(kubectl get receiver -n flux-system intikepri-static-git -o jsonpath='{.status.webhookPath}')
 STATIC_IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-static-image -o jsonpath='{.status.webhookPath}')
 
-echo "intikepri-static Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$STATIC_GIT_PATH"
-echo "intikepri-static Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$STATIC_IMAGE_PATH"
+echo "intikepri-static Forgejo webhook URL: https://flux-webhook.kudofools.dev$STATIC_GIT_PATH"
+echo "intikepri-static Docker Hub webhook URL: https://flux-webhook.kudofools.dev$STATIC_IMAGE_PATH"
 
 # intikepri-cms
 CMS_GIT_PATH=$(kubectl get receiver -n flux-system intikepri-cms-git -o jsonpath='{.status.webhookPath}')
 CMS_IMAGE_PATH=$(kubectl get receiver -n flux-system intikepri-cms-image -o jsonpath='{.status.webhookPath}')
 
-echo "intikepri-cms Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_GIT_PATH"
-echo "intikepri-cms Docker Hub webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$CMS_IMAGE_PATH"
+echo "intikepri-cms Forgejo webhook URL: https://flux-webhook.kudofools.dev$CMS_GIT_PATH"
+echo "intikepri-cms Docker Hub webhook URL: https://flux-webhook.kudofools.dev$CMS_IMAGE_PATH"
 
 # intikepri-infra
 INFRA_PATH=$(kubectl get receiver -n flux-system intikepri-infra-webhook -o jsonpath='{.status.webhookPath}')
-echo "intikepri-infra Forgejo webhook URL: http://notification-controller.flux-system.svc.cluster.local:80$INFRA_PATH"
+echo "intikepri-infra Forgejo webhook URL: https://flux-webhook.kudofools.dev$INFRA_PATH"
 ```
 
 ### Forgejo webhook configuration
@@ -89,7 +89,7 @@ Flux watches both the `intikepri-static` and `intikepri-cms` repos on Forgejo. F
 
 | Field | Value |
 |---|---|
-| Target URL | `http://notification-controller.flux-system.svc.cluster.local:80<git-webhook-path>` |
+| Target URL | `https://flux-webhook.kudofools.dev<hook>` (where `hook` is the receiver's webhook path) |
 | HTTP Method | POST |
 | POST Content Type | `application/json` |
 | Secret | the token from the project's OpenBao path (`kv/intikepri-static/webhook-token` or `kv/intikepri-cms/webhook-token`) |
@@ -127,7 +127,7 @@ In each Docker Hub repo, go to **Webhooks** tab:
 | Field | Value |
 |---|---|
 | **Name** | `Flux Image Automation` |
-| **URL** | `http://notification-controller.flux-system.svc.cluster.local:80<image-webhook-path>` |
+| **URL** | `https://flux-webhook.kudofools.dev<hook>` (where `hook` is the receiver's webhook path) |
 
 No secret, no content type, no event selection. Docker Hub sends a POST to that URL on every image push. The token is embedded in the webhook path itself (Flux generates a unique path from Receiver name + namespace + token), so no separate secret field is needed.
 
