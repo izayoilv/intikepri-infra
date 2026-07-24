@@ -25,3 +25,13 @@ metadata:
     app.kubernetes.io/part-of: intikepri
     app.kubernetes.io/managed-by: flux
     tier: application
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intikepri-minio
+  labels:
+    app.kubernetes.io/name: intikepri-minio
+    app.kubernetes.io/part-of: intikepri
+    app.kubernetes.io/managed-by: flux
+    tier: storage

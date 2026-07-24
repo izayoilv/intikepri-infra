@@ -49,6 +49,7 @@ Two separate ExternalSecrets sync webhook tokens from intikepri-openbao, one per
 | `intikepri-static-webhook` | `kv/intikepri-static/webhook-token` | `intikepri-static` Receivers |
 | `intikepri-cms-webhook` | `kv/intikepri-cms/webhook-token` | `intikepri-cms` Receivers |
 | `intikepri-infra-webhook` | `kv/intikepri-infra/webhook-token` | `intikepri-infra-webhook` Receiver |
+| `intikepri-minio` | `kv/intikepri-cms/minio` | MinIO root credentials (`rootUser`, `rootPassword`) |
 
 To set them up:
 
@@ -57,11 +58,14 @@ To set them up:
 STATIC_TOKEN=$(openssl rand -base64 32)
 CMS_TOKEN=$(openssl rand -base64 32)
 INFRA_TOKEN=$(openssl rand -base64 32)
+MINIO_USER=minio
+MINIO_PASS=$(openssl rand -base64 32)
 
 # 2. Write to intikepri-openbao
 kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-static/webhook-token token=$STATIC_TOKEN
 kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/webhook-token token=$CMS_TOKEN
 kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-infra/webhook-token token=$INFRA_TOKEN
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/minio rootUser=$MINIO_USER rootPassword=$MINIO_PASS
 
 # 3. Get the Receiver webhook paths
 # intikepri-static
@@ -148,6 +152,69 @@ No secret, no content type, no event selection. Docker Hub sends a POST to that 
 ### Bootstrap secrets
 
 The `intikepri-opentofu-secrets` Secret in `flux-system` contains bootstrap credentials (`cloudflare_api_token`, `openbao_token`, `cloudflare_zone_id`, `cloudflare_account_id`). These are the keys to the kingdom and must be provided manually — they can't come from OpenBao since OpenTofu configures OpenBao itself. Keep them secure and rotate periodically.
+
+## MinIO Object Storage
+
+MinIO is deployed via HelmRelease in `intikepri-minio` namespace using the community chart with Chainguard's hardened image.
+
+### Services
+
+| Service | Hostname | Port | Purpose |
+|---------|----------|------|---------|
+| S3 API | `s3.intikepri.com` | 9000 | S3-compatible API for the CMS |
+| Console | `minio.intikepri.com` | 9001 | Web UI for managing buckets and access keys |
+
+Internal cluster endpoints:
+- `minio.intikepri-minio.svc.cluster.local:9000` — S3 API
+- `minio-console.intikepri-minio.svc.cluster.local:9001` — Console
+
+### Seeding root credentials
+
+```bash
+MINIO_USER=minio
+MINIO_PASS=$(openssl rand -base64 32)
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/minio rootUser=$MINIO_USER rootPassword=$MINIO_PASS
+echo "User: $MINIO_USER  Pass: $MINIO_PASS"
+```
+
+The ExternalSecret `intikepri-minio` in `flux-system` syncs these credentials to a Secret in `intikepri-minio`.
+
+### Accessing the Console
+
+1. Browse to `https://minio.intikepri.com`
+2. Log in with `rootUser`/`rootPassword` from the seeded credentials
+3. Navigate the object browser to view/manage the `intikepri-cms` bucket
+
+### Creating an access key for the CMS
+
+From the Console, go to **Access Keys → Create access key**:
+
+| Field | Value |
+|-------|-------|
+| Access Key | auto-generated (or set manually) |
+| Secret Key | auto-generated (save immediately — shown once) |
+| Restrict beyond user policy | optional — scope to `intikepri-cms` bucket |
+
+Save the generated key and secret. You'll need to seed them into OpenBao for the CMS:
+
+```bash
+kubectl exec -n intikepri-openbao intikepri-openbao-0 -- env BAO_TOKEN=$ROOT_TOKEN bao kv put kv/intikepri-cms/minio-access-key accessKey=<key> secretKey=<secret>
+```
+
+Then create an ExternalSecret to sync them into the `intikepri-cms` namespace (see `clusters/default/platform/eso-resources/` for examples).
+
+### Reconciling
+
+```bash
+flux reconcile helmrelease -n flux-system minio
+```
+
+### Health check
+
+```bash
+kubectl get pods -n intikepri-minio
+kubectl logs -n intikepri-minio -l app.kubernetes.io/name=intikepri-minio
+```
 
 ## Cloudflare Tunnel
 

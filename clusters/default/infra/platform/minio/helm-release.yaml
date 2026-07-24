@@ -1,0 +1,47 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: minio
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://charts.min.io/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: minio
+  namespace: flux-system
+spec:
+  interval: 30m
+  targetNamespace: intikepri-minio
+  chart:
+    spec:
+      chart: minio
+      sourceRef:
+        kind: HelmRepository
+        name: minio
+      interval: 12h
+  values:
+    image:
+      repository: cgr.dev/chainguard/minio
+      tag: latest@sha256:f03dcef49bcc11daa8fc0fd4e31a898bd8ab9fa2294a51be3b135967127b3d58
+    mode: standalone
+    replicas: 1
+    existingSecret: intikepri-minio
+    persistence:
+      storageClass: local-path
+      size: 5Gi
+    resources:
+      requests:
+        memory: 512Mi
+    buckets:
+      - name: intikepri-cms
+        policy: none
+        purge: false
+    service:
+      type: ClusterIP
+      port: 9000
+    consoleService:
+      type: ClusterIP
+      port: 9001
